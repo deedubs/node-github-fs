@@ -1,0 +1,15 @@
+{
+  "author": "",
+  "name": "github-fs",
+  "version": "0.0.0",
+  "dependencies": {
+    "expect.js": "~0.1.2",
+    "mocha": "~1.3.0",
+    "superagent": "~0.6.0"
+  },
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  }
+}
