@@ -4,7 +4,7 @@ var expect = require('expect.js')
 
 describe('GithubFS', function () {
   before(function() {
-    this.gfs = new GithubFS('deedubs/deploy', {auth: authData});
+    this.gfs = new GithubFS('deedubs/test-repo', {auth: authData});
   });
 
   it('.rename');
@@ -21,6 +21,7 @@ describe('GithubFS', function () {
     var gfs = this.gfs;
 
     gfs.readdir('', function (err, dirListing) {
+      expect(dirListing).to.be.an(Array);
       expect(dirListing[0]).to.have.property('name');
       expect(dirListing[0]).to.have.property('path');
       expect(dirListing[0]).to.have.property('size');
@@ -31,7 +32,7 @@ describe('GithubFS', function () {
   it('.exists', function (done) {
     var gfs = this.gfs;
 
-    gfs.exists('Makefile', function (exists) {
+    gfs.exists('README.md', function (exists) {
       expect(exists).to.be.ok();
       done();
     });
@@ -40,12 +41,16 @@ describe('GithubFS', function () {
   it('.readFile', function (done) {
     var gfs = this.gfs;
 
-    gfs.readFile('Makefile', function (err, contents) {
-      expect(contents).to.contain('install');
+    gfs.readFile('README.md', function (err, contents) {
+      expect(contents).to.contain('test-repo');
       done();
     });
   });
   
-  it('.writeFile');
+  it('.writeFile', function (done) {
+    var gfs = this.gfs;
+
+    gfs.writeFile('Testfile','This is sweet!!\nIndeed!\nNeat', done);
+  });
 
 });
