@@ -1,8 +1,10 @@
 var request = require('superagent')
+  , debug = require('debug')('github:fs')
   , githubBaseUri = 'https://api.github.com';
 
-function GithubFS(repositoryName) {
+function GithubFS(repositoryName, options) {
   this.repositoryName = repositoryName;
+  this.options = options;
 }
 
 GithubFS.prototype.realpath = function (path, cache, callback) {
@@ -15,45 +17,69 @@ GithubFS.prototype.realpath = function (path, cache, callback) {
 };
 
 GithubFS.prototype.exists = function (filename, callback) {
+  var options = this.options;
+
   this
     .realpath(filename, function (err, path) {
-      request
-        .head(path)
-        .end(function (res) {
-          callback(res.statusCode === 200);
-        });
+      var req = request
+        .head(path);
+
+      if(options.auth) {
+        debug('Making authenticated request');
+        req.auth(options.auth.username, options.auth.password)
+      };
+
+      req.end(function (res) {
+        callback(res.statusCode === 200);
+      });
     });
 };
 
 GithubFS.prototype.readFile = function (filename, callback) {
+  var options = this.options;
+
   this
     .realpath(filename, function (err, path) {
-      request
+      var req = request
         .get(path)
-        .set('Accept', 'application/vnd.github.beta.raw+json')
-        .end(function (res) {
-          if (res.statusCode === 200) {
-            callback(null, res.text);
-          } else {
-            callback(new Error(res.body));
-          }
-        });
+        .set('Accept', 'application/vnd.github.beta.raw+json');
+
+      if(options.auth) {
+        debug('Making authenticated request');
+        req.auth(options.auth.username, options.auth.password)
+      };
+
+      req.end(function (res) {
+        if (res.statusCode === 200) {
+          callback(null, res.text);
+        } else {
+          callback(new Error(res.body));
+        }
+      });
     });
 };
 
 GithubFS.prototype.readdir = function (dirname, callback) {
+  var options = this.options;
+
   this
     .realpath(dirname, function (err, path) {
-      request
+      var req = request
         .get(path)
-        .set('Accept', 'application/vnd.github.beta.raw+json')
-        .end(function (res) {
-          if (res.statusCode === 200) {
-            callback(null, res.body);
-          } else {
-            callback(new Error(res.body));
-          }
-        });
+        .set('Accept', 'application/vnd.github.beta.raw+json');
+
+      if(options.auth) {
+        debug('Making authenticated request');
+        req.auth(options.auth.username, options.auth.password)
+      };
+
+      req.end(function (res) {
+        if (res.statusCode === 200) {
+          callback(null, res.body);
+        } else {
+          callback(new Error(res.body));
+        }
+      });
     });
 };
 

@@ -1,9 +1,10 @@
 var expect = require('expect.js')
-  , GithubFS = require('../');
+  , GithubFS = require('../')
+  , authData = require('./auth');
 
 describe('GithubFS', function () {
   before(function() {
-    this.gfs = new GithubFS('deedubs/deploy');
+    this.gfs = new GithubFS('deedubs/deploy', {auth: authData});
   });
 
   it('.rename');
