@@ -75,6 +75,21 @@ GithubFS.prototype.readdir = function (dirname, callback) {
     });
 };
 
+GithubFS.prototype.currentCommit = function (callback) {
+  var options = this.options
+    , path = githubBaseUri + '/repos/' + this.repositoryName + '/commits?per_page=1';
+
+  var req = buildRequest('get', path, options);
+
+  req.end(function (res) {
+    if(res.statusCode >= 200 && res.statusCode < 300) {
+      callback(null, res.body[0]);
+    } else {
+      callback(new Error(res.body.message));
+    }
+  });
+}
+
 GithubFS.prototype.writeFile = function (filename, content, callback) {
   if(!this.options.auth) {
     return callback(new Error('options.auth is required'));
@@ -85,49 +100,56 @@ GithubFS.prototype.writeFile = function (filename, content, callback) {
     , refsUrl = githubBaseUri + '/repos/' + this.repositoryName + '/git/refs/heads/master'
     , options = this.options;
 
-  request
-    .post(treeUrl)
-    .set('Accept', 'application/vnd.github.beta.raw+json')
-    .auth(options.auth.username, options.auth.password)
-    .send({
-      tree: [{
-        path: filename
-        , type: 'blob'
-        , mode: '100644'
-        , content: content
-      }]
-    })
-    .end(function (res) {
-      var treeSha = res.body.sha;
+  this.currentCommit(function(err, commitData) {
+    var currentTree = commitData.commit.tree.sha
+      , currentSha = commitData.sha;
+      
+    request
+      .post(treeUrl)
+      .set('Accept', 'application/vnd.github.beta.raw+json')
+      .auth(options.auth.username, options.auth.password)
+      .send({
+          base_tree: currentTree
+        , tree: [{
+              path: filename
+            , type: 'blob'
+            , mode: '100644'
+            , content: content
+          }]
+      })
+      .end(function (res) {
+        var treeSha = res.body.sha;
 
-      request
-        .post(commitUrl)
-        .set('Accept', 'application/vnd.github.beta.raw+json')
-        .auth(options.auth.username, options.auth.password)
-        .send({
-            message: 'Commit from node-github-fs'
-          , tree: treeSha
-        })
-        .end(function (res) {
-          var commitSha = res.body.sha;
+        request
+          .post(commitUrl)
+          .set('Accept', 'application/vnd.github.beta.raw+json')
+          .auth(options.auth.username, options.auth.password)
+          .send({
+              message: 'Commit from node-github-fs'
+            , tree: treeSha
+            , parents: [currentSha]
+          })
+          .end(function (res) {
+            var commitSha = res.body.sha;
+  
+            request
+              .patch(refsUrl)
+              .set('Accept', 'application/vnd.github.beta.raw+json')
+              .auth(options.auth.username, options.auth.password)
+              .send({
+                  sha: commitSha
+              })
+              .end(function (res) {
+                if(res.statusCode >= 200 && res.statusCode < 300) {
+                  callback();
+                } else {
+                  callback(new Error(res.body.message));
+                }
+              });
+          });
 
-          request
-            .patch(refsUrl)
-            .set('Accept', 'application/vnd.github.beta.raw+json')
-            .auth(options.auth.username, options.auth.password)
-            .send({
-                sha: commitSha
-            })
-            .end(function (res) {
-              if(res.statusCode >= 200 && res.statusCode < 300) {
-                callback();
-              } else {
-                callback(new Error(res.body.message));
-              }
-            });
-        });
-
-    });
+      });
+  });
 };
 
 module.exports = GithubFS;
