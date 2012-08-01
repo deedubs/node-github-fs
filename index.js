@@ -8,7 +8,7 @@ function GithubFS(repositoryName, options) {
   gfs.repositoryName = repositoryName;
   gfs.options = options;
   gfs.baseUrl = githubBaseUri + '/repos/' + gfs.repositoryName;
-  
+
   gfs.urls = {
       trees: gfs.baseUrl + '/git/trees'
     , commits: gfs.baseUrl + '/git/commits'
@@ -18,12 +18,14 @@ function GithubFS(repositoryName, options) {
 }
 
 GithubFS.prototype.realpath = function (path, cache, callback) {
+  var gfs = this;
+
   if (typeof(cache) === 'function') {
     callback = cache;
     cache = null;
   }
 
-  callback(null, githubBaseUri + '/repos/' + this.repositoryName + '/contents/' + path);
+  callback(null, gfs.baseUrl + '/contents/' + path);
 };
 
 GithubFS.prototype.exists = function (filename, callback) {
@@ -130,7 +132,7 @@ GithubFS.prototype.writeFile = function (filename, content, callback) {
 
         req
           .send({
-              message: 'Commit from node-github-fs'
+              message: 'Commit from node-github-fs - ' + (new Date()).toUTCString()
             , tree: treeSha
             , parents: [currentSha]
           })
