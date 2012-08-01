@@ -1,7 +1,7 @@
 {
   "author": "Dan Williams <me@deedubs.com> (http://deedubs.com/)",
   "name": "github-fs",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "dependencies": {
     "superagent": "~0.6.0",
     "debug": "~0.7.0"
