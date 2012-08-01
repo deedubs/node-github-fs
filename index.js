@@ -7,12 +7,13 @@ function GithubFS(repositoryName, options) {
 
   gfs.repositoryName = repositoryName;
   gfs.options = options;
-
+  gfs.baseUrl = githubBaseUri + '/repos/' + gfs.repositoryName;
+  
   gfs.urls = {
-      trees: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/trees'
-    , commits: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/commits'
-    , refs: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/refs/heads/master'
-    , lastCommit: githubBaseUri + '/repos/' + gfs.repositoryName + '/commits?per_page=1'
+      trees: gfs.baseUrl + '/git/trees'
+    , commits: gfs.baseUrl + '/git/commits'
+    , refs: gfs.baseUrl + '/git/refs/heads/master'
+    , lastCommit: gfs.baseUrl + '/commits?per_page=1'
   };
 }
 
