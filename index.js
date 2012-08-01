@@ -3,8 +3,17 @@ var request = require('superagent')
   , githubBaseUri = 'https://api.github.com';
 
 function GithubFS(repositoryName, options) {
-  this.repositoryName = repositoryName;
-  this.options = options;
+  var gfs = this;
+
+  gfs.repositoryName = repositoryName;
+  gfs.options = options;
+
+  gfs.urls = {
+      trees: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/trees'
+    , commits: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/commits'
+    , refs: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/refs/heads/master'
+    , lastCommit: githubBaseUri + '/repos/' + gfs.repositoryName + '/commits?per_page=1'
+  }
 }
 
 GithubFS.prototype.realpath = function (path, cache, callback) {
@@ -17,15 +26,15 @@ GithubFS.prototype.realpath = function (path, cache, callback) {
 };
 
 GithubFS.prototype.exists = function (filename, callback) {
-  var options = this.options;
+  var gfs = this;
 
   this
     .realpath(filename, function (err, path) {
-      var req = buildRequest('head', path, options)
+      var req = buildRequest('head', path, gfs.options)
 
-      if(options.auth) {
+      if(gfs.options.auth) {
         debug('Making authenticated request');
-        req.auth(options.auth.username, options.auth.password)
+        req.auth(gfs.options.auth.username, gfs.options.auth.password)
       };
 
       req.end(function (res) {
@@ -35,16 +44,16 @@ GithubFS.prototype.exists = function (filename, callback) {
 };
 
 GithubFS.prototype.readFile = function (filename, callback) {
-  var options = this.options;
+  var gfs = this;
 
   this
     .realpath(filename, function (err, path) {
-      var req = buildRequest('get', path, options)
+      var req = buildRequest('get', path, gfs.options)
         .set('Accept', 'application/vnd.github.beta.raw+json');
 
-      if(options.auth) {
+      if(gfs.options.auth) {
         debug('Making authenticated request');
-        req.auth(options.auth.username, options.auth.password)
+        req.auth(gfs.options.auth.username, gfs.options.auth.password)
       };
 
       req.end(function (res) {
@@ -58,11 +67,11 @@ GithubFS.prototype.readFile = function (filename, callback) {
 };
 
 GithubFS.prototype.readdir = function (dirname, callback) {
-  var options = this.options;
+  var gfs = this;
 
   this
     .realpath(dirname, function (err, path) {
-      var req = buildRequest('get', path, options)
+      var req = buildRequest('get', path, gfs.options)
         .set('Accept', 'application/vnd.github.beta.raw+json');
 
       req.end(function (res) {
@@ -76,10 +85,8 @@ GithubFS.prototype.readdir = function (dirname, callback) {
 };
 
 GithubFS.prototype.currentCommit = function (callback) {
-  var options = this.options
-    , path = githubBaseUri + '/repos/' + this.repositoryName + '/commits?per_page=1';
-
-  var req = buildRequest('get', path, options);
+  var gfs = this
+    , req = buildRequest('get', this.urls.lastCommit, gfs.options);
 
   req.end(function (res) {
     if(res.statusCode >= 200 && res.statusCode < 300) {
@@ -91,24 +98,18 @@ GithubFS.prototype.currentCommit = function (callback) {
 }
 
 GithubFS.prototype.writeFile = function (filename, content, callback) {
-  if(!this.options.auth) {
+  var gfs = this;
+
+  if(!gfs.options.auth) {
     return callback(new Error('options.auth is required'));
   }
 
-  var treeUrl = githubBaseUri + '/repos/' + this.repositoryName + '/git/trees'
-    , commitUrl = githubBaseUri + '/repos/' + this.repositoryName + '/git/commits'
-    , refsUrl = githubBaseUri + '/repos/' + this.repositoryName + '/git/refs/heads/master'
-    , options = this.options;
-
   this.currentCommit(function(err, commitData) {
     var currentTree = commitData.commit.tree.sha
-      , currentSha = commitData.sha;
+      , currentSha = commitData.sha
+      , req = buildRequest('post', gfs.urls.trees, gfs.options);
       
-    request
-      .post(treeUrl)
-      .set('Accept', 'application/vnd.github.beta.raw+json')
-      .auth(options.auth.username, options.auth.password)
-      .send({
+    req.send({
           base_tree: currentTree
         , tree: [{
               path: filename
@@ -118,27 +119,23 @@ GithubFS.prototype.writeFile = function (filename, content, callback) {
           }]
       })
       .end(function (res) {
-        var treeSha = res.body.sha;
+        var treeSha = res.body.sha
+          , req = buildRequest('post', gfs.urls.commits, gfs.options);
 
-        request
-          .post(commitUrl)
-          .set('Accept', 'application/vnd.github.beta.raw+json')
-          .auth(options.auth.username, options.auth.password)
+        req
           .send({
-              message: 'Commit from node-github-fs'
-            , tree: treeSha
-            , parents: [currentSha]
-          })
+                message: 'Commit from node-github-fs'
+              , tree: treeSha
+              , parents: [currentSha]
+            })
           .end(function (res) {
-            var commitSha = res.body.sha;
+            var commitSha = res.body.sha
+              , req = buildRequest('post', gfs.urls.refs, gfs.options);
   
-            request
-              .patch(refsUrl)
-              .set('Accept', 'application/vnd.github.beta.raw+json')
-              .auth(options.auth.username, options.auth.password)
+            req
               .send({
                   sha: commitSha
-              })
+                })
               .end(function (res) {
                 if(res.statusCode >= 200 && res.statusCode < 300) {
                   callback();
@@ -154,7 +151,7 @@ GithubFS.prototype.writeFile = function (filename, content, callback) {
 
 module.exports = GithubFS;
 
-function buildRequest(type, path, options, callback) {
+function buildRequest(type, path, options) {
   var req = request[type](path);
 
   if(options.auth) {
