@@ -13,7 +13,7 @@ function GithubFS(repositoryName, options) {
     , commits: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/commits'
     , refs: githubBaseUri + '/repos/' + gfs.repositoryName + '/git/refs/heads/master'
     , lastCommit: githubBaseUri + '/repos/' + gfs.repositoryName + '/commits?per_page=1'
-  }
+  };
 }
 
 GithubFS.prototype.realpath = function (path, cache, callback) {
@@ -28,14 +28,9 @@ GithubFS.prototype.realpath = function (path, cache, callback) {
 GithubFS.prototype.exists = function (filename, callback) {
   var gfs = this;
 
-  this
+  gfs
     .realpath(filename, function (err, path) {
-      var req = buildRequest('head', path, gfs.options)
-
-      if(gfs.options.auth) {
-        debug('Making authenticated request');
-        req.auth(gfs.options.auth.username, gfs.options.auth.password)
-      };
+      var req = buildRequest('head', path, gfs.options);
 
       req.end(function (res) {
         callback(res.statusCode === 200);
@@ -46,15 +41,9 @@ GithubFS.prototype.exists = function (filename, callback) {
 GithubFS.prototype.readFile = function (filename, callback) {
   var gfs = this;
 
-  this
+  gfs
     .realpath(filename, function (err, path) {
-      var req = buildRequest('get', path, gfs.options)
-        .set('Accept', 'application/vnd.github.beta.raw+json');
-
-      if(gfs.options.auth) {
-        debug('Making authenticated request');
-        req.auth(gfs.options.auth.username, gfs.options.auth.password)
-      };
+      var req = buildRequest('get', path, gfs.options);
 
       req.end(function (res) {
         if (res.statusCode === 200) {
@@ -69,10 +58,9 @@ GithubFS.prototype.readFile = function (filename, callback) {
 GithubFS.prototype.readdir = function (dirname, callback) {
   var gfs = this;
 
-  this
+  gfs
     .realpath(dirname, function (err, path) {
-      var req = buildRequest('get', path, gfs.options)
-        .set('Accept', 'application/vnd.github.beta.raw+json');
+      var req = buildRequest('get', path, gfs.options);
 
       req.end(function (res) {
         if (res.statusCode === 200) {
@@ -86,25 +74,42 @@ GithubFS.prototype.readdir = function (dirname, callback) {
 
 GithubFS.prototype.currentCommit = function (callback) {
   var gfs = this
-    , req = buildRequest('get', this.urls.lastCommit, gfs.options);
+    , req = buildRequest('get', gfs.urls.lastCommit, gfs.options);
 
   req.end(function (res) {
-    if(res.statusCode >= 200 && res.statusCode < 300) {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
       callback(null, res.body[0]);
     } else {
       callback(new Error(res.body.message));
     }
   });
-}
+};
 
 GithubFS.prototype.writeFile = function (filename, content, callback) {
   var gfs = this;
 
-  if(!gfs.options.auth) {
+  if (!gfs.options.auth) {
     return callback(new Error('options.auth is required'));
   }
 
-  this.currentCommit(function(err, commitData) {
+  function finalize(res) {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      callback();
+    } else {
+      callback(new Error(res.body.message));
+    }
+  }
+
+  function buildReference(res) {
+    var commitSha = res.body.sha
+      , req = buildRequest('post', gfs.urls.refs, gfs.options);
+
+    req
+      .send({ sha: commitSha })
+      .end(finalize);
+  }
+
+  gfs.currentCommit(function buildCommit(err, commitData) {
     var currentTree = commitData.commit.tree.sha
       , currentSha = commitData.sha
       , req = buildRequest('post', gfs.urls.trees, gfs.options);
@@ -124,27 +129,11 @@ GithubFS.prototype.writeFile = function (filename, content, callback) {
 
         req
           .send({
-                message: 'Commit from node-github-fs'
-              , tree: treeSha
-              , parents: [currentSha]
-            })
-          .end(function (res) {
-            var commitSha = res.body.sha
-              , req = buildRequest('post', gfs.urls.refs, gfs.options);
-  
-            req
-              .send({
-                  sha: commitSha
-                })
-              .end(function (res) {
-                if(res.statusCode >= 200 && res.statusCode < 300) {
-                  callback();
-                } else {
-                  callback(new Error(res.body.message));
-                }
-              });
-          });
-
+              message: 'Commit from node-github-fs'
+            , tree: treeSha
+            , parents: [currentSha]
+          })
+        .end(buildReference);
       });
   });
 };
@@ -154,9 +143,9 @@ module.exports = GithubFS;
 function buildRequest(type, path, options) {
   var req = request[type](path);
 
-  if(options.auth) {
+  if (options.auth) {
     req.auth(options.auth.username, options.auth.password);
   }
 
-  return req;    
+  return req;
 }
